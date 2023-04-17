@@ -1,2 +1,2 @@
-# sprut.hub.scenarios
+# Sprut Hub Scenarios
 Сценарии автоматизации для spruthub.ru
