@@ -503,12 +503,12 @@ interface HttpResponse {
     /**
      * info
      */
-    getHeaders(): Record;
+    getHeaders(): Record<string, string[]>;
 
     /**
      * info
      */
-    getCookies(): Record;
+    getCookies(): Record<string, string>;
 
 
     /**
