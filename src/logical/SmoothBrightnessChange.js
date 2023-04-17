@@ -76,4 +76,3 @@ function trigger(source, value, variables, options) {
         }, delay);
     }
 }
-
