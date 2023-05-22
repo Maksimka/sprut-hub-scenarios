@@ -1,4 +1,4 @@
-// version 1.7.4
+// version 1.7.6
 // https://pastebin.com/YX1mm9h6
 
 let chatIDs = [];
@@ -6,11 +6,14 @@ let token = ''
 
 let feed = {};
 let gCallbacks = {};
+let gCommands = {};
+
 let callbackTs = 0;
+let startTime = Math.floor(Date.now() / 1000);
 
 function tg(key) {
     let id = Date.now() + Math.random().toString(36);
-    
+
     let chats = [];
     let messages = [];
     let silent = false;
@@ -39,7 +42,7 @@ function tg(key) {
             photoPayload = payload;
             return builder;
         },
-        chat: function () {
+        chat: function (/**/) {
             var args = Array.prototype.slice.call(arguments);
             args.forEach(function (chatId) {
                 if (Array.isArray(chatId)) {
@@ -54,6 +57,10 @@ function tg(key) {
             buttons.push({ text: text, callback: callback, data: id + (buttons.length + 1) });
             return builder;
         },
+        watch: function(key, callback) {
+            gCommands[key] = callback;
+            return true;
+        },
         send: function(/**/) {
             var args = Array.prototype.slice.call(arguments);
             args.forEach(function (line) {
@@ -63,7 +70,7 @@ function tg(key) {
                     messages.push(line);
                 }
             });
-            
+
             let now = Math.floor(Date.now() / 1000);
             if (!!key && feed[key] !== undefined && now - feed[key] <= throttleSec) return;
             feed[key] = now;
@@ -80,8 +87,8 @@ function tg(key) {
                         .queryString("parse_mode", "Markdown")
                         .queryString("disable_notification", silent);
                     if (photoPayload != null) {
-                        request = typeof photoPayload === 'string' || photoPayload instanceof String 
-                            ? request.field('photo', photoPayload) 
+                        request = typeof photoPayload === 'string' || photoPayload instanceof String
+                            ? request.field('photo', photoPayload)
                             : request.fieldMultipart('photo', photoPayload);
                     }
                     if (buttons.length) {
@@ -111,16 +118,17 @@ function tg(key) {
 }
 
 function tgWatch() {
-    let offset = 0;
     let bot = global.variables && global.variables['tg:token'] || token;
     if (GlobalVariables.tg_loop != null) {
         clearInterval(GlobalVariables.tg_loop);
     }
     let loop = function () {
-        if (!Object.keys(gCallbacks).length) return;
-        
+        if (!Object.keys(gCallbacks).length && !Object.keys(gCommands).length) return;
+
         let now = Math.floor(Date.now() / 1000);
         if (now - callbackTs > 3600) gCallbacks = {};
+
+        let offset = GlobalVariables.__tg_offset || 0;
         let body = HttpClient.GET("https://api.telegram.org")
             .path("bot" + bot)
             .path('getUpdates')
@@ -129,10 +137,10 @@ function tgWatch() {
             .getBody()
         JSON.parse(body).result.forEach(function (r) {
             if (r.update_id < offset) return;
-            offset = r.update_id + 1;
-            let data = r.callback_query.data;
+            GlobalVariables.__tg_offset = r.update_id + 1;
             try {
-                if (gCallbacks[data] != undefined) gCallbacks[data]();
+                if (!!r.callback_query && gCallbacks[r.callback_query.data] != undefined) gCallbacks[r.callback_query.data](tg());
+                if (!!r.message && r.message.date >= startTime && gCommands[r.message.text] != undefined) gCommands[r.message.text](tg());
             } catch (e) {
                 log.error(e.message);
             }
